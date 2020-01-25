@@ -34,8 +34,7 @@
   CAV Voltage on PIN 9 is connected to INT1 IRQ pin and is used to promptly turn off the timing pins whenever CAV drops to zero. 
   A zener diode as added to protect the AVR input, as the CAV voltage can reach up to 6.4Volts.
 
-
-/*
+  
      
       +------- Output Mux -MSbits-----+
 Input |   7       6       5       8
@@ -48,11 +47,6 @@ Input |   7       6       5       8
       +-------+-------+-------+-------+
 */
 
-#define inputMuxA       6
-#define inputMuxB       7
-#define outputMuxA      0
-#define outputMuxB      1
-#define outputMuxInhibt 2
 
 #define _key1        (0<<3)|(0<<2)|(0<<1)|(0<<0) // 0
 #define _key2        (0<<3)|(0<<2)|(0<<1)|(1<<0) // 1
@@ -94,8 +88,11 @@ Input |   7       6       5       8
 #define fireTop         4
 #define fireBottom      5
 
-#define _6Button 0
-#define _3Button 1
+enum controllerType {
+  _6Button=0,
+  _3Button,
+  _unKnown =0xff
+  };
 
 #define buttonUp     (1<<0)
 #define buttonDown   (1<<1)
@@ -114,9 +111,6 @@ Input |   7       6       5       8
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
-
-
 uint8_t ScanGenesis(void);
 void assertTopFire(void);
 void releaseTopFire(void);
@@ -130,14 +124,48 @@ void setMaximumX(void);
 void setMiddleX(void); 
 
 
-static volatile uint8_t CAVon;
+static volatile uint8_t CAVoff;
 uint16_t combinedButtons = 0;
 
 
-TODO: // ISR para desativar CAV e variavel CAVon
-         Programar interrupcoes para pin change ou externa
+//TODO: // ISR para desativar CAV e variavel CAVon
+//         Programar interrupcoes para pin change ou externa
+
+//
+// External interrupt, triggers every time CAV voltage changes state.
+ISR (INT1_vect, ISR_NAKED) { 
+  asm volatile (
+    "push __tmp_reg__\n\t"         //
+    "in __tmp_reg__,__SREG__\n\t"  //  Save Context
+    "push __tmp_reg__\n\t"         //
+    
+    "clr __tmp_reg__\n\t"         // temp_reg=0 CAVoff = false
+
+    "sbrc %[PORTIN],3 \n\t"       // CAV has dropped?
+    "rjmp _STORE\n\t"             // no update value
+    "cbi %[PORTPOTS],2\n\t"       // yes, force pin Y to zero
+    "cbi %[DDRPOTS],2\n\t"
+    "cbi %[PORTPOTS],3\n\t"       // yes, force pin X to zero
+    "cbi %[DDRPOTS],3\n\t"
+    "inc __tmp_reg__\n\t"         // temp_reg=1 CAVoff = true                        
+    "_STORE:\n\t"
+    "sts __tmp_reg__,%[flagCAVoff]\n\t" // store CAVoff flag value
 
 
+    "pop __tmp_reg__\n\t"           //
+    "out __SREG__,__tmp_reg__\n\t"  // Restore Context
+    "pop __tmp_reg__\n\t"           //
+    "reti \n\t"
+    :[flagCAVoff]"=r"(CAVoff)
+    :[PORTIN]"I" (_SFR_IO_ADDR(PIND)),[DDRPOTS]"I" (_SFR_IO_ADDR(DDRB)) ,[PORTPOTS]"I" (_SFR_IO_ADDR(PORTB)) 
+    );  
+    
+    
+  
+  
+  
+  
+  }
 
 void setup() {
   // put your setup code here, to run once:
@@ -150,6 +178,12 @@ void setup() {
   pinMode(genesisSelect,OUTPUT);
   digitalWrite(genesisSelect,LOW);
   delay(5); // wait for genesis internal logic timeout
+
+  // Setup interrupts
+  EICRA = (0<<ISC11)| (1<<ISC10); //  Any logical change on INT1 generates an interrupt request.
+  EIMSK = (1<<INT1);              //  enable external interrupts on pin INT1 (D3)
+  EIFR =  (1<<INT1); // clear any pending interrupt
+  sei();  // enable interrupts
 }
 
 void loop() {
@@ -196,7 +230,7 @@ void loop() {
       }
       
   
-    } else { // 
+    } else { // Mode button released
       switch(combinedButtons) {
         case buttonX:     // keypad * 
            setKeypad (_keyAsterisk);
@@ -299,13 +333,13 @@ void setKeypad ( uint8_t keyCode) {
 
 
 void setMinimumX(void) {
-  if (CAVon) {
+  if (!CAVoff) {
     digitalWrite(potXfull,HIGH);
     pinMode(potXfull,OUTPUT);
   }
 }
 void setMaximumX(void) {
-  if (CAVon) {
+  if (!CAVoff) {
     pinMode(potXhalf,INPUT);
     digitalWrite(potXhalf,LOW); // turn off pullup
     pinMode(potXfull,INPUT);
@@ -313,7 +347,7 @@ void setMaximumX(void) {
   } 
 }
 void setMiddleX(void){
-  if (CAVon) {
+  if (!CAVoff) {
     pinMode(potXfull,INPUT);
     digitalWrite(potXfull,LOW);  // turn off pullup   
     digitalWrite(potXhalf,HIGH);    
@@ -322,13 +356,13 @@ void setMiddleX(void){
 }
 
 void setMinimumY(void) {
-  if (CAVon) {
+  if (!CAVoff) {
     digitalWrite(potYfull,HIGH);
     pinMode(potYfull,OUTPUT);
   }
 }
 void setMaximumY(void) {
-  if (CAVon) {
+  if (!CAVoff) {
     pinMode(potYhalf,INPUT);
     digitalWrite(potYhalf,LOW); // turn off pullup
     pinMode(potYfull,INPUT);
@@ -336,7 +370,7 @@ void setMaximumY(void) {
   } 
 }
 void setMiddleY(void){
-  if (CAVon) {
+  if (!CAVoff) {
     pinMode(potYfull,INPUT);
     digitalWrite(potYfull,LOW);  // turn off pullup   
     digitalWrite(potYhalf,HIGH);    
@@ -404,7 +438,7 @@ uint8_t ScanGenesis(void) {
   } else if  ( (sample[6] & 0x0c) == 0)  {
   type = _3Button;
   } else
-    return 0xff; // unknown
+    return _unKnown; // unknown
 
   // now populate combinedButtons variable accordingly
                                                             // 11 10 9  8  7  6  5  4  3  2  1  0
