@@ -51,6 +51,22 @@ Input |   7       6       5       8
  1 0  |   3   |   6   |   9   |   #   | 1
  1 1  | start | pause | reset |   -   | 4
       +-------+-------+-------+-------+
+
+
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    
 */
 
 
@@ -63,6 +79,10 @@ Input |   7       6       5       8
  *     \__,_\___|_| |_|_||_|_|\__|_\___/_||_/__/
  *                                              
  */
+
+//#define DEBUG 1
+
+ 
 #define _key1        ((0<<3)|(0<<2)|(0<<1)|(0<<0)) // 0
 #define _key2        ((0<<3)|(0<<2)|(0<<1)|(1<<0)) // 1
 #define _key3        ((0<<3)|(0<<2)|(1<<1)|(0<<0)) // 2
@@ -160,26 +180,22 @@ ISR (INT1_vect, ISR_NAKED) {
   asm volatile (
     "push __tmp_reg__\n\t"         //
     "in __tmp_reg__,__SREG__\n\t"  //  Save Context
-    "push __tmp_reg__\n\t"         //
-    
+    "push __tmp_reg__\n\t"         //  
     "clr __tmp_reg__\n\t"         // temp_reg=0 CAVoff = false
-
-    "sbrc %[PORTIN],3 \n\t"       // CAV has dropped?
+    "sbic %[PORTIN],3 \n\t"       // CAV has dropped?
     "rjmp _STORE\n\t"             // no update value
     "cbi %[PORTPOTS],2\n\t"       // yes, force pin Y to zero
-    "cbi %[DDRPOTS],2\n\t"
+    "sbi %[DDRPOTS],2\n\t"
     "cbi %[PORTPOTS],3\n\t"       // yes, force pin X to zero
-    "cbi %[DDRPOTS],3\n\t"
+    "sbi %[DDRPOTS],3\n\t"
     "inc __tmp_reg__\n\t"         // temp_reg=1 CAVoff = true                        
     "_STORE:\n\t"
-    "sts __tmp_reg__,%[flagCAVoff]\n\t" // store CAVoff flag value
-
-
+     "sts %[flagCAVoff],__tmp_reg__\n\t" // store CAVoff flag value
     "pop __tmp_reg__\n\t"           //
     "out __SREG__,__tmp_reg__\n\t"  // Restore Context
     "pop __tmp_reg__\n\t"           //
     "reti \n\t"
-    :[flagCAVoff]"=r"(CAVoff)
+    :[flagCAVoff] "=m"(CAVoff)
     :[PORTIN]"I" (_SFR_IO_ADDR(PIND)),[DDRPOTS]"I" (_SFR_IO_ADDR(DDRB)) ,[PORTPOTS]"I" (_SFR_IO_ADDR(PORTB)) 
     );  
   }
@@ -195,6 +211,16 @@ ISR (INT1_vect, ISR_NAKED) {
  */
 void setup() {
   // put your setup code here, to run once:
+
+  pinMode(potXfull,INPUT);
+  pinMode(potXhalf,OUTPUT);
+  digitalWrite(potXhalf,HIGH);
+  
+  pinMode(potYfull,INPUT);
+  pinMode(potYhalf,OUTPUT);
+  digitalWrite(potYhalf,HIGH);  
+
+  
   pinMode(genesisUp    ,INPUT_PULLUP);
   pinMode(genesisDown  ,INPUT_PULLUP);
   pinMode(genesisLeft  ,INPUT_PULLUP);
@@ -203,16 +229,24 @@ void setup() {
   pinMode(genesisC     ,INPUT_PULLUP);
   pinMode(genesisSelect,OUTPUT);
   digitalWrite(genesisSelect,LOW);
+  pinMode(outputMuxB,OUTPUT); 
+  pinMode(outputMuxA,OUTPUT); 
+  pinMode(inputMuxB,OUTPUT); 
+  pinMode(inputMuxA,OUTPUT);   
   pinMode(outputMuxInhibt,OUTPUT);
   digitalWrite(outputMuxInhibt,HIGH);
   delay(5); // wait for genesis internal logic timeout
 
+ 
   // Setup interrupts
   EICRA = (0<<ISC11)| (1<<ISC10); //  Any logical change on INT1 generates an interrupt request.
   EIMSK = (1<<INT1);              //  enable external interrupts on pin INT1 (D3)
   EIFR =  (1<<INT1); // clear any pending interrupt
-//  sei();  // enable interrupts
-Serial.begin(9600);
+  
+  sei();  // enable interrupts
+#ifdef DEBUG
+  Serial.begin(9600);
+#endif
 }
 
 
@@ -226,12 +260,10 @@ Serial.begin(9600);
  *                                        |_|   
  */
 void loop() {
-  uint8_t controllerType; // = ScanGenesis(); 
-
- //  for (;;) {
- 
-    controllerType = ScanGenesis();
+  uint8_t controllerType; 
+  controllerType = ScanGenesis();
     
+#ifdef DEBUG    
     Serial.print("Type:");
     switch (controllerType) {
       case _6Button:
@@ -243,24 +275,18 @@ void loop() {
       default:
           Serial.print ("Master/unknown ");
           break;                    
-
       }
-
      Serial.print  ("buttons:");
-//     combinedButtons |= (1<<15);
      Serial.print   ((combinedButtons | (1<<15)),BIN);
+#endif
 
- //   Serial.println(); delay(8); // 8 milliseconds between readings.  
-    
-//    } // for (;;)
+//controllerType = _3Button;  // fake 3 button for testing only 
 
-
-controllerType = _3Button;  // TOD REMOVE 
-Serial.print ("faking 3 button ");
-  
   if ( controllerType == _6Button)   {  // do 6 Button Stuff
     if (combinedButtons & buttonMode) {
+#ifdef DEBUG      
       Serial.print (" m ");
+#endif      
       combinedButtons &= ~buttonMode;  // clear Mode button bit 
       switch(combinedButtons) {
         case buttonUp:    // keypad 8
@@ -317,28 +343,32 @@ Serial.print ("faking 3 button ");
            break;
         default:       // None or multiple
            setKeypad (_keyNone);
-      }
+      } // switch
       
       // Take care of buttons
       if (combinedButtons & (buttonA | buttonC) ) assertTopFire(); else releaseTopFire();
       if (combinedButtons &  buttonB ) assertBottomFire(); else releaseBottomFire();
       
       // Take care of directionals
-      if ( (combinedButtons & (buttonUp)) && !(combinedButtons & (buttonDown) ) ) { // minimum Y
-        setMinimumY();
-      } else if (!buttonUp && buttonDown) { // maximum Y
-        setMaximumY();
-      } else { // Y at middle
-        setMiddleY();   
-      } 
+   // Activate 5200 port accordingly 
+     if ((combinedButtons & buttonUp) && (combinedButtons & buttonDown)) // if both UP and DOWN go to middle
+          setMiddleY(); 
+     else 
+        if ( combinedButtons & buttonUp    ) 
+          setMinimumY();
+     else if ( combinedButtons & (buttonDown)  ) 
+          setMaximumY();
+     else setMiddleY(); 
   
-      if (buttonLeft && !buttonRight) { // minimum X
-        setMinimumX();
-      } else if (!buttonLeft && buttonRight) { // maximum X
-        setMaximumX();
-      } else { // X at middle
-        setMiddleX();   
-      } 
+     // Activate 5200 port accordingly 
+     if ((combinedButtons & buttonLeft) && (combinedButtons & buttonRight) ) // if both UP and DOWN go to middle
+          setMiddleX(); 
+     else 
+        if ( combinedButtons & buttonLeft    ) 
+          setMinimumX();
+     else if ( combinedButtons & (buttonRight)  ) 
+          setMaximumX();
+     else setMiddleX(); 
   
     }
   } else if (controllerType == _3Button ) { // work with 3 button, limited functionality
@@ -427,29 +457,31 @@ Serial.print ("faking 3 button ");
 	
       // Take care of Start Button		
       if (combinedButtons & buttonStart) setKeypad (_keyPause); else setKeypad (_keyNone);
-
-
 	  
       // Take care of buttons
       if (combinedButtons & (buttonA ) ) assertTopFire(); else releaseTopFire();
       if (combinedButtons &  buttonB ) assertBottomFire(); else releaseBottomFire();
       
       // Take care of directionals
-      if ( (combinedButtons & (buttonUp)) && !(combinedButtons & (buttonDown) ) ) { // minimum Y
-        setMinimumY();
-      } else if (!buttonUp && buttonDown) { // maximum Y
-        setMaximumY();
-      } else { // Y at middle
-        setMiddleY();   
-      } 
+   // Activate 5200 port accordingly 
+     if ((combinedButtons & buttonUp) && (combinedButtons & buttonDown )) // if both UP and DOWN go to middle
+          setMiddleY(); 
+     else 
+        if ( combinedButtons & buttonUp    ) 
+          setMaximumY();
+     else if ( combinedButtons & (buttonDown)  ) 
+          setMaximumY();
+     else setMiddleY(); 
   
-      if (buttonLeft && !buttonRight) { // minimum X
-        setMinimumX();
-      } else if (!buttonLeft && buttonRight) { // maximum X
-        setMaximumX();
-      } else { // X at middle
-        setMiddleX();   
-      }
+     // Activate 5200 port accordingly 
+     if ((combinedButtons & buttonLeft) && (combinedButtons & buttonRight)) // if both UP and DOWN go to middle
+          setMiddleX(); 
+     else 
+        if ( combinedButtons & buttonLeft    ) 
+          setMaximumX();
+     else if ( combinedButtons & (buttonRight)  ) 
+          setMaximumX();
+     else setMiddleX(); 
 	  
 	} // else
 
@@ -478,11 +510,12 @@ Serial.print ("faking 3 button ");
 
 void setKeypad ( uint8_t keyCode) {
   char key[16]={"123S456P789R*0#N"};
+#ifdef DEBUG  
   Serial.print (" Key:");
   Serial.print (keyCode);
   Serial.print ("->");  
   Serial.println (key[keyCode]);
-
+#endif
   if (keyCode & (1<<3) ) digitalWrite(outputMuxB,HIGH); else digitalWrite(outputMuxB,LOW);
   if (keyCode & (1<<2) ) digitalWrite(outputMuxA,HIGH); else digitalWrite(outputMuxA,LOW); 
   
