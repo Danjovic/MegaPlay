@@ -81,7 +81,7 @@ Input |   7       6       5       8
  */
 
 //#define DEBUG 1
-
+#define NOMODEKEY
  
 #define _key1        ((0<<3)|(0<<2)|(0<<1)|(0<<0)) // 0
 #define _key2        ((0<<3)|(0<<2)|(0<<1)|(1<<0)) // 1
@@ -324,9 +324,92 @@ void loop() {
            break;
         default:       // None or multiple
            setKeypad (_keyNone);    
-      }
-      
-  
+      } // switch(combinedButtons)
+
+#ifdef NOMODEKEY
+
+  } else 
+    if (combinedButtons & buttonC )  {  // Modifier key pressed  
+	   if (combinedButtons & buttonB) {  // Second modifier key pressed  
+	      if (combinedButtons & buttonA) { // Third modifier key pressed (C+B+A)
+		  // C+B+A pressed
+		  combinedButtons &= ~(buttonC | buttonB | buttonA); // clear modifier buttons bits 
+				switch (combinedButtons) {
+					case buttonLeft:  // keypad 7
+					   setKeypad (_key7);
+					   break;		
+					case buttonUp:    // keypad 8
+					   setKeypad (_key8);
+					   break;		
+					case buttonRight: // keypad 9
+					   setKeypad (_key9);
+					   break;		
+//			case buttonDown:  // keypad * 
+//			   setKeypad (_keyAsterisk);
+//			   break;
+					case buttonStart:     // Reset
+					   setKeypad (_keyReset);
+					   break; 
+//			case buttonA:     // keypad #
+//			   setKeypad (_keyHash);
+//			   break;
+					default:       // None or multiple
+					   setKeypad (_keyNone);		   
+				} // switch			
+		  } else { // C+B modifier keys pressed
+		  combinedButtons &= ~(buttonC | buttonB); // clear modifier buttons bits 
+				switch (combinedButtons) {
+					case buttonLeft:  // keypad 4
+					   setKeypad (_key4);
+					   break;		
+					case buttonUp:    // keypad 5
+					   setKeypad (_key5);
+					   break;		
+					case buttonRight: // keypad 6
+					   setKeypad (_key6);
+					   break;		
+//			case buttonDown:  // keypad * 
+//			   setKeypad (_keyAsterisk);
+//			   break;
+					case buttonStart:     // Start
+					   setKeypad (_keyStart);
+					   break; 
+//			case buttonA:     // keypad #
+//			   setKeypad (_keyHash);
+//			   break;
+					default:       // None or multiple
+					   setKeypad (_keyNone);		   
+				} // switch	
+		  } // else
+		   
+	} else { // Only C modifier key pressed
+	combinedButtons &= ~(buttonC); // clear modifier buttons bits 		
+		switch (combinedButtons) {
+			case buttonLeft:  // keypad 1
+			   setKeypad (_key1);
+			   break;		
+			case buttonUp:    // keypad 2
+			   setKeypad (_key2);
+			   break;		
+			case buttonRight: // keypad 3
+			   setKeypad (_key3);
+			   break;		
+			case buttonDown:  // keypad * 
+			   setKeypad (_keyAsterisk);
+			   break;
+			case buttonStart: // keypad 0
+			   setKeypad (_key0);
+			   break; 
+			case buttonA:     // keypad #
+			   setKeypad (_keyHash);
+			   break;
+			default:       // None or multiple
+			   setKeypad (_keyNone);		   
+		} // switch	
+	} // else
+
+#endif		
+
     } else { // Mode button released
       switch(combinedButtons) {
         case buttonX:     // keypad * 
@@ -346,7 +429,12 @@ void loop() {
       } // switch
       
       // Take care of buttons
+#ifdef NOMODEKEY	  
+      if (combinedButtons & buttonA  ) assertTopFire(); else releaseTopFire();	  
+#else 	  
       if (combinedButtons & (buttonA | buttonC) ) assertTopFire(); else releaseTopFire();
+#endif	  
+
       if (combinedButtons &  buttonB ) assertBottomFire(); else releaseBottomFire();
       
       // Take care of directionals
@@ -370,7 +458,10 @@ void loop() {
           setMaximumX();
      else setMiddleX(); 
   
-    }
+    } // end of 6 button controller handling
+	
+	
+
   } else if (controllerType == _3Button ) { // work with 3 button, limited functionality
     
 
@@ -483,7 +574,7 @@ void loop() {
           setMaximumX();
      else setMiddleX(); 
 	  
-	} // else
+	}  // end of 3 button controller handling
 
       
   } else { // No controller detected, 
