@@ -384,12 +384,7 @@ void loop() {
       } // switch
       
       // Take care of buttons
-#ifdef NOMODEKEY	  
       if (combinedButtons & buttonA  ) assertTopFire(); else releaseTopFire();	  
-#else 	  
-      if (combinedButtons & (buttonA | buttonC) ) assertTopFire(); else releaseTopFire();
-#endif	  
-
       if (combinedButtons &  buttonB ) assertBottomFire(); else releaseBottomFire();
       
       // Take care of directionals
