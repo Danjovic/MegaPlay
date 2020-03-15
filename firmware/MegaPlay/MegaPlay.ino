@@ -18,39 +18,40 @@
   Keypad presses are emulated by activating a pair of analog multiplexers. Only 1 (one) keypress can be simulated at a time. 
   When there is no key pressed the "output" multiplexer is inhibited. Buttons are mapped as follows:
 
-                         +--------------------+ 
-                         |      6 buttons     | 
-    +--------+-----------+------MODE key------+ 
-    | Button | 3 buttons | Released | Pressed | 
-    +--------+ ----------+----------+---------+ 
-    | UP     |    UP     |    UP    |    8    | 
-    | DOWN   |   DOWN    |  DOWN    |  Reset  | 
-    | LEFT   |   LEFT    |  LEFT    |    7    | 
-    | RIGHT  |   RIGHT   |  RIGHT   |    9    | 
-    |  A     |    Top    |   Top    |    4    | 
-    |  B     |   Bottom  |  Bottom  |    5    | 
-    |  C     |    Top    |   Top    |    6    | 
-    | START  |   Pause   |  Pause   |  Start  | 
-    +--------+-----------+----------+---------+ 
-    |  X     |     -     |    *     |    1    | 
-    |  Y     |     -     |    0     |    2    | 
-    |  Z     |     -     |    #     |    3    | 
-    +--------+-----------+----------+---------+  
+                    +------------------------------------------+
+                    |           Modifier key(s) pressed        |
++----------+--------+-----------+----------+---------+---------+
+|   Type   | Button |   none    |    C     |  C + B  |  C+B+A  |
++-----+----+--------+ ----------+----------+---------+---------+
+|  6  | 3  | UP     |    UP     |    2     |    5    |    8    |
+|  B  | B  | DOWN   |   DOWN    |    *     |    -    |    -    |
+|  u  | u  | LEFT   |   LEFT    |    1     |    4    |    7    |
+|  t  | t  | RIGHT  |   RIGHT   |    3     |    6    |    9    |
+|  t  | t  |  A     |    Top    |    #     |    -    |    -    |
+|  o  | o  |  B     |   Bottom  |    -     |    -    |    -    |
+|  n  | n  |  C     |     -     |    -     |    -    |    -    |
+|     |    | START  |   Pause   |    0     |  Start  |  Reset  |
+|     +----+--------+-----------+----------+---------+---------+
+|          |  X     |     *     |    *     |    *    |    *    |
+|          |  Y     |     0     |    0     |    0    |    0    |
+|          |  Z     |     #     |    #     |    #    |    #    |
++----------+--------+-----------+----------+---------+---------+ 
+
+  Keypresses are emulated by activation of the following combination of signals. 
+  The 'none' key state is issued by rising the INHIBT signal to disabe the output MUX.
+
+        +------- Output Mux -MSbits-----+
+  Input |   7       6       5       8   |
+   Mux  |  0 0  |  0 1  |  1 0  |  1 1  |
+   B A  +-------+-------+-------+-------+ 
+   0 0  |   1   |   4   |   7   |   *   | 3
+   0 1  |   2   |   5   |   8   |   0   | 2
+   1 0  |   3   |   6   |   9   |   #   | 1
+   1 1  | start | pause | reset |  none | 4
+        +-------+-------+-------+-------+
 
   CAV Voltage on PIN 9 is connected to INT1 IRQ pin and is used to promptly turn off the timing pins whenever CAV drops to zero. 
   A zener diode as added to protect the AVR input, as the CAV voltage can reach up to 6.4Volts.
-
-  
-     
-      +------- Output Mux -MSbits-----+
-Input |   7       6       5       8
- Mux  |  0 0  |  0 1  |  1 0  |  1 1  |
- B A  +-------+-------+-------+-------+ 
- 0 0  |   1   |   4   |   7   |   *   | 3
- 0 1  |   2   |   5   |   8   |   0   | 2
- 1 0  |   3   |   6   |   9   |   #   | 1
- 1 1  | start | pause | reset |   -   | 4
-      +-------+-------+-------+-------+
 
 
 
@@ -283,7 +284,8 @@ void loop() {
 //controllerType = _3Button;  // fake 3 button for testing only 
 
   if ( controllerType == _6Button)   {  // do 6 Button Stuff
-    if (combinedButtons & buttonMode) {
+  
+    if (combinedButtons & buttonMode) {  // TODO cleanup the part of code that deals with MODE key
 #ifdef DEBUG      
       Serial.print (" m ");
 #endif      
