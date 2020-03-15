@@ -82,7 +82,7 @@
  */
 
 //#define DEBUG 1
-#define NOMODEKEY
+
  
 #define _key1        ((0<<3)|(0<<2)|(0<<1)|(0<<0)) // 0
 #define _key2        ((0<<3)|(0<<2)|(0<<1)|(1<<0)) // 1
@@ -284,53 +284,7 @@ void loop() {
 //controllerType = _3Button;  // fake 3 button for testing only 
 
   if ( controllerType == _6Button)   {  // do 6 Button Stuff
-  
-    if (combinedButtons & buttonMode) {  // TODO cleanup the part of code that deals with MODE key
-#ifdef DEBUG      
-      Serial.print (" m ");
-#endif      
-      combinedButtons &= ~buttonMode;  // clear Mode button bit 
-      switch(combinedButtons) {
-        case buttonUp:    // keypad 8
-           setKeypad (_key8);
-           break;
-        case buttonDown:  // Reset
-           setKeypad (_keyReset);
-           break;
-        case buttonLeft:  // keypad 7
-           setKeypad (_key7);
-           break;
-        case buttonRight: // keypad 9
-           setKeypad (_key9);
-           break;
-        case buttonA:     // keypad 4
-           setKeypad (_key4);
-           break; 
-        case buttonB:     // keypad 5
-           setKeypad (_key5);
-           break;
-        case buttonC:     // keypad 6
-           setKeypad (_key6);
-           break;  
-        case buttonX:     // keypad 1
-           setKeypad (_key1);
-           break;
-        case buttonY:     // keypad 2
-           setKeypad (_key2);
-           break;    
-        case buttonZ:     // keypad 3
-           setKeypad (_key3);
-           break;
-        case buttonStart: // Start
-           setKeypad (_keyStart);
-           break;
-        default:       // None or multiple
-           setKeypad (_keyNone);    
-      } // switch(combinedButtons)
 
-#ifdef NOMODEKEY
-
-  } else 
     if (combinedButtons & buttonC )  {  // Modifier key pressed  
 	   if (combinedButtons & buttonB) {  // Second modifier key pressed  
 	      if (combinedButtons & buttonA) { // Third modifier key pressed (C+B+A)
@@ -409,8 +363,7 @@ void loop() {
 			   setKeypad (_keyNone);		   
 		} // switch	
 	} // else
-
-#endif		
+	
 
     } else { // Mode button released
       switch(combinedButtons) {
