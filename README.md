@@ -12,5 +12,5 @@ Sega Genesis/Megadrive controller adapter with keypad emulation for Atari 5200
   
   Buttons are mapped as follows:
 
-![Buttons Mapping](/doc/3an6buttonMapping.jpg)
+![Buttons Mapping](doc/3and6buttonMapping.jpg)
 
