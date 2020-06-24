@@ -10,4 +10,7 @@ Sega Genesis/Megadrive controller adapter with keypad emulation for Atari 5200
   Keypad presses are emulated by activating a pair of analog multiplexers. Only 1 (one) keypress can be simulated at a time. 
   When there is no key pressed the "output" multiplexer is inhibited. 
   
+  Buttons are mapped as follows:
+
+![Buttons Mapping](/doc/3an6buttonMapping.jpg)
 
